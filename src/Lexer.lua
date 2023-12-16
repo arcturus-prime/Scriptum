@@ -1,3 +1,6 @@
+local Tokens = require(script.Parent.Tokens)
+local Token = Tokens.token
+
 export type Token = {
 	kind: any,
 	value: any?,
@@ -8,24 +11,21 @@ export type Info = {
 	index: number,
 }
 
-
-local Tokens = require(script.Parent.Tokens)
-
 --Some handlers are externally defined so they can be duplicated for different characters
 
-local function consumeSingleComment (code, i)
+local function consumeSingleComment (code: string, i: number)
 	local _, e = string.find(code, "\n", i)
 
-	return { kind = Tokens.token.comment, value = string.sub(code, i, e) }, e
+	return { kind = Token.comment.single, value = string.sub(code, i, e) }, e
 end
 
-local function consumeWord(code, i)
+local function consumeWord(code: string, i: number)
 	local _, e = string.find(code, "%w+", i)
 
-	return { kind = Tokens.token.word, value = string.sub(code, i, e) }, e
+	return { kind = Token.word, value = string.sub(code, i, e) }, e
 end
 
-local function consumeNumber(code, i)
+local function consumeNumber(code: string, i: number)
 	local s, e
 	if string.sub(code, i, i + 1) == "0x" then
 		s, e = string.find(code, "[0-9a-fA-Fx]+", i)
@@ -33,16 +33,16 @@ local function consumeNumber(code, i)
 		s, e = string.find(code, "[0-9]+%.?[0-9]*", i)
 	end
 
-	return { kind = Tokens.token.literalNumber, value = tonumber(string.sub(code, s, e)) }, e
+	return { kind = Token.literal.number, value = tonumber(string.sub(code, s, e)) }, e
 end
 
-local function consumeWhitespace(code, i)
+local function consumeWhitespace(code: string, i: number)
 	local _, e = string.find(code, "%s+", i)
 
-	return nil, e
+	return Token.whitespace, e
 end
 
-local function consumeString(code: string, i: index)
+local function consumeString(code: string, i: number)
 	local ending = string.sub(code, i, i)
 	local e = i + 1
 
@@ -51,10 +51,10 @@ local function consumeString(code: string, i: index)
 	end
 
 	local value = if i - e == 1 then "" else string.sub(code, i + 1, e - 1)
-	return { kind = Tokens.token.literalString, value = value }, e
+	return { kind = Token.literal.stringSingle, value = value }, e
 end
 
-local function consumeMultiline(code, i) 
+local function consumeMultiline(code: string, i: number) 
 	local char = string.sub(code, i, i)
 
 	local value, _, n
@@ -70,14 +70,14 @@ local function consumeMultiline(code, i)
 	return string.sub(code, i + #value + 1, e - 1), e
 end
 
-local function consumeMultilineComment(code, i)
+local function consumeMultilineComment(code: string, i: number)
 	local v, e = consumeMultiline(code, i)
-	return { kind = Tokens.token.multilineComment, value = v }, e
+	return { kind = Token.comment.multi, value = v }, e
 end
 
-local function consumeMultilineString(code, i)
+local function consumeMultilineString(code: string, i: number)
 	local v, e = consumeMultiline(code, i)
-	return { kind = Tokens.token.multilineString, value = v }, e
+	return { kind = Token.literal.stringSingle, value = v }, e
 end
 
 --This is the main data structure for parsing
@@ -86,7 +86,6 @@ end
 local tree = {
 	["\""] = consumeString,
 	["\'"] = consumeString,
-
 	["-"] = {
 		["-"] = {
 			["["] = {
@@ -96,63 +95,63 @@ local tree = {
 			},
 			[""] = consumeSingleComment,
 		},
-		[">"] = Tokens.token.assignmentSub,
-		[""] = Tokens.token.sub,
+		[">"] = Token.operator.assignmentSub,
+		[""] = Token.operator.sub,
 	},
 	["+"] = {
-		["="] = Tokens.token.assignmentAdd,
-		[""] = Tokens.token.add,
+		["="] = Token.operator.assignmentAdd,
+		[""] = Token.operator.add,
 	},
 	["*"] = {
-		["="] = Tokens.token.assignmentMul,
-		[""] = Tokens.token.mul,
+		["="] = Token.operator.assignmentMul,
+		[""] = Token.operator.mul,
 	},
 	["/"] = {
 		["/"] = {
-			["="] = Tokens.token.assignmentFloorDiv,
-			[""] = Tokens.token.floorDiv,
+			["="] = Token.operator.assignmentFloorDiv,
+			[""] = Token.operator.floorDiv,
 		},
-		["="] = Tokens.token.assignmentAdd,
-		[""] = Tokens.token.add,
+		["="] = Token.operator.assignmentAdd,
+		[""] = Token.operator.add,
 	},
 	["<"] = {
-		["="] = Tokens.token.lessThanEqual,
-		[""] = Tokens.token.angledStart,
+		["="] = Token.operator.lessThanEqual,
+		[""] = Token.operator.lessThan,
 	},
 	[">"] = {
-		["="] = Tokens.token.greaterThanEqual,
-		[""] = Tokens.token.angledEnd,
+		["="] = Token.operator.greaterThanEqual,
+		[""] = Token.operators.greaterThan,
 	},
-	["%"] = Tokens.token.mod,
+	["%"] = Token.operator.mod,
 	["~"] = {
-		["="] = Tokens.token.notEqual,
+		["="] = Token.operator.notEqual,
 		[""] = function (code, i)
 			error("Invalid character at " .. i)
 		end,
 	},
-	["^"] = Tokens.token.pow,
-	["{"] = Tokens.token.braceStart,
-	["}"] = Tokens.token.braceEnd,
-	["#"] = Tokens.token.length,
-	["="] = Tokens.token.assignment,
-	[":"] = Tokens.token.colon,
-	[","] = Tokens.token.comma,
+	["^"] = Token.operator.pow,
+	["{"] = Token.seperator.braceStart,
+	["}"] = Token.seperator.braceEnd,
+	["#"] = Token.operator.length,
+	["="] = Token.operator.assignment,
+	[":"] = Token.operator.colon,
+	[","] = Token.seperator.comma,
 	["."] = {
 		["."] = {
-			["="] = Tokens.token.assignmentConcat,
-			[""] = Tokens.token.concat,
+			["="] = Token.operator.assignmentConcat,
+			[""] = Token.operator.concat,
 		},
-		[""] = Tokens.token.dot,
+		[""] = Token.operator.dot,
 	},
-	["("] = Tokens.token.paraStart,
-	[")"] = Tokens.token.paraEnd,
+	["("] = Token.seperator.paraStart,
+	[")"] = Token.seperator.paraEnd,
 	["["] = {
 		["["] = consumeMultilineString,
 		["="] = consumeMultilineString,
-		[""] = Tokens.token.bracketStart,
+		[""] = Token.seperator.bracketStart,
 	},
-	["]"] = Tokens.token.bracketEnd,
-	["?"] = Tokens.token.optional,
+	["]"] = Token.seperator.bracketEnd,
+	["?"] = Token.operator.optional,
 	[""] = function (code, i)
 		error("Unrecognized character at " .. i)
 	end,

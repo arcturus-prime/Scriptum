@@ -1,11 +1,18 @@
-export type Node = {}
+local Lexer = require(script.Parent.Lexer)
 
-local node = {
-	operatorUnary = newproxy(),
-	operatorBinary = newproxy(),
-	operatorTernary = newproxy(),
+export type Node = {
+	kind: any,
+	[number]: { Token }
+}
 
-	assignment = newproxy(),
+local concrete = {
+	expression = newproxy(),
+	statement = newproxy(),
+	block = newproxy(),
+}
+
+local astract = {
+
 }
 
 local name = {}
@@ -15,6 +22,7 @@ for k, v in node do
 end
 
 return {
-	node = node,
+	concrete = concrete,
+	abstract = abstract
 	name = name,
 }
