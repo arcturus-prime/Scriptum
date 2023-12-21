@@ -1,18 +1,91 @@
-local Lexer = require(script.Parent.Lexer)
-
+--Forms of nodes
 export type Node = {
-	kind: any,
-	[number]: { Token }
+	kind: any
 }
 
-local concrete = {
-	expression = newproxy(),
-	statement = newproxy(),
-	block = newproxy(),
+export type Type = Node & {
+
 }
 
-local astract = {
+export type Variable = Node & {
+	type: Type?,
+	scope: { Node },
+	name: string,
+}
+export type Constant = Node & { value: any }
 
+export type Value = Variable | Constant
+
+export type List = Node & { values: { Value } }
+
+export type Branch = Node & {
+	condition: Node,
+	body: { Node }
+}
+
+export type ForNumericLoop = Node & {
+	var: Variable,
+	lower: Value,
+	upper: Value,
+	step: Value,
+	body: { Node }
+}
+
+export type ForGeneralLoop = Node & {
+	vars: List,
+	exp: Node,
+	body: { Node }
+}
+
+export type BranchTree = Node & { 
+	branches: { Branch }
+}
+
+export type Operation = Node & {
+	operands: { Node }
+}
+
+--Specific nodes
+local node = {
+	variable = newproxy(),
+	constant = newproxy(),
+	list = newproxy(),
+
+	functionDecl = newproxy(),
+	tableDecl = newproxy(),
+
+	whileLoop = newproxy(),
+	repeatLoop = newproxy(),
+	forNumericLoop = newproxy(),
+	forGeneralLoop = newproxy(),
+	branchTree = newproxy(),
+
+	ellipses = newproxy(),
+
+	length = newproxy(),
+	dot = newproxy(),
+	concat = newproxy(),
+	add = newproxy(),
+	sub = newproxy(),
+	mul = newproxy(),
+	div = newproxy(),
+	mod = newproxy(),
+	pow = newproxy(),
+	floorDiv = newproxy(),
+	equal = newproxy(),
+	notEqual = newproxy(),
+	lessThan = newproxy(),
+	lessThanEqual = newproxy(),
+	greaterThan = newproxy(),
+	greaterThanEqual = newproxy(),
+	assignment = newproxy(),
+	assignmentAdd = newproxy(),
+	assignmentSub = newproxy(),
+	assignmentMul = newproxy(),
+	assignmentDiv = newproxy(),
+	assignmentMod = newproxy(),
+	assignmentPow = newproxy(),
+	assignmentConcat = newproxy(),
 }
 
 local name = {}
@@ -22,7 +95,6 @@ for k, v in node do
 end
 
 return {
-	concrete = concrete,
-	abstract = abstract
-	name = name,
+	node = node,
+	name = name
 }

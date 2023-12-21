@@ -1,83 +1,96 @@
 local Tokens = require(script.Parent.Tokens)
 local Token = Tokens.token
 
-export type Token = {
-	kind: any,
-	value: any?,
-}
-
 export type Info = {
 	code: string,
 	index: number,
 }
 
---Some handlers are externally defined so they can be duplicated for different characters
+--Handlers are externally defined so they can be duplicated for different characters
 
-local function consumeSingleComment (code: string, i: number)
-	local _, e = string.find(code, "\n", i)
-
-	return { kind = Token.comment.single, value = string.sub(code, i, e) }, e
+local function isNotUnescapedChar(code: string, i: number, ending: string)
+	return string.sub(code, i, i) ~= ending or (string.sub(code, i - 1, i - 1) == "\\" and string.sub(code, i - 2, i - 1) ~= "\\\\")
 end
 
-local function consumeWord(code: string, i: number)
-	local _, e = string.find(code, "%w+", i)
+local function consumeWord(info: Info, tokens: { Tokens.Token })
+	local _, e = string.find(info.code, "%w+", info.index)
 
-	return { kind = Token.word, value = string.sub(code, i, e) }, e
+	table.insert(tokens, { kind = Token.word, value = string.sub(info.code, info.index, e) })
+	info.index = e
 end
 
-local function consumeNumber(code: string, i: number)
+local function consumeNumber(info: Info, tokens: { Tokens.Token })
 	local s, e
-	if string.sub(code, i, i + 1) == "0x" then
-		s, e = string.find(code, "[0-9a-fA-Fx]+", i)
+	if string.sub(info.code, info.index, info.index + 1) == "0x" then
+		s, e = string.find(info.code, "[0-9a-fA-Fx]+", info.index)
 	else
-		s, e = string.find(code, "[0-9]+%.?[0-9]*", i)
+		s, e = string.find(info.code, "[0-9]*%.?[0-9]*", info.index)
 	end
 
-	return { kind = Token.literal.number, value = tonumber(string.sub(code, s, e)) }, e
+	info.index = e
+
+	table.insert(tokens, { kind = Token.number, value = tonumber(string.sub(info.code, s, e)) })
 end
 
-local function consumeWhitespace(code: string, i: number)
-	local _, e = string.find(code, "%s+", i)
+local function consumeWhitespace(info: Info, tokens: { Tokens.Token })
+	local _, e = string.find(info.code, "%s+", info.index)
 
-	return Token.whitespace, e
+	info.index = e
+
+	table.insert(tokens, { kind = Token.whitespace })
 end
 
-local function consumeString(code: string, i: number)
-	local ending = string.sub(code, i, i)
-	local e = i + 1
+local function consumeString(info: Info, tokens: { Tokens.Token })
+	local ending = string.sub(info.code, info.index, info.index)
+	local e = info.index + 1
 
-	while string.sub(code, e, e) ~= ending or (string.sub(code, e - 1, e - 1) == "\\" and string.sub(code, e - 2, e - 1) ~= "\\\\") do
+	while isNotUnescapedChar(info.code, e, ending) do
 		e += 1
 	end
 
-	local value = if i - e == 1 then "" else string.sub(code, i + 1, e - 1)
-	return { kind = Token.literal.stringSingle, value = value }, e
+	local value = if info.index - e == 1 then "" else string.sub(info.code, info.index + 1, e - 1)
+
+	info.index = e
+
+	table.insert(tokens, { kind = Token.string, value = value })
 end
 
-local function consumeMultiline(code: string, i: number) 
-	local char = string.sub(code, i, i)
+local function consumeMultilineString(info: Info, tokens: { Tokens.Token })
+	local value = ""
 
-	local value, _, n
-
-	if char == "=" then
-		 _, n = string.find(code, "=*", i)
-		 value = string.sub(code, i, n)
-	else
-		value = ""
+	if string.sub(info.code, info.index, info.index) == "=" then
+		value = string.match(info.code, "=+", info.index)
 	end
 
-	local e, _ = string.find(code, "%]" .. value .. "%]", m)
-	return string.sub(code, i + #value + 1, e - 1), e
+	local s, e = string.find(info.code, "%]" .. value .. "%]", info.index)
+
+	table.insert(tokens, { kind = Token.string, value = string.sub(info.code, info.index + #value + 1, s - 1) })
+
+	info.index = e
 end
 
-local function consumeMultilineComment(code: string, i: number)
-	local v, e = consumeMultiline(code, i)
-	return { kind = Token.comment.multi, value = v }, e
+local function consumeComment(info: Info, tokens: { Tokens.Token }) 
+	local value = ""
+
+	if string.sub(info.code, info.index + 1, info.index + 1) == "[" then
+		value = string.match(info.code, "=+", info.index + 2)
+	end
+
+	local ending = "\n"
+
+	if string.find(info.code, "%[" .. value .. "%[", info.index + 1) == info.index + 1 then
+		ending = "%]" .. value .. "%]"
+	end
+
+	local s, e = string.find(info.code, ending, info.index)
+
+	table.insert(tokens, { kind = Token.comment, value = string.sub(info.code, info.index + 3 + #value, s - 1) })
+
+	info.index = e
 end
 
-local function consumeMultilineString(code: string, i: number)
-	local v, e = consumeMultiline(code, i)
-	return { kind = Token.literal.stringSingle, value = v }, e
+local function errorLex(info: Info, tokens: { Tokens.Token })
+	error("Unrecognized character at " .. info.index)
 end
 
 --This is the main data structure for parsing
@@ -87,78 +100,72 @@ local tree = {
 	["\""] = consumeString,
 	["\'"] = consumeString,
 	["-"] = {
-		["-"] = {
-			["["] = {
-				["["] = consumeMultilineComment,
-				["="] = consumeMultilineComment,
-				[""] = consumeSingleComment
-			},
-			[""] = consumeSingleComment,
-		},
-		[">"] = Token.operator.assignmentSub,
-		[""] = Token.operator.sub,
+		["-"] = consumeComment,
+		[">"] = Token.arrow,
+		[""] = Token.sub,
 	},
 	["+"] = {
-		["="] = Token.operator.assignmentAdd,
-		[""] = Token.operator.add,
+		["="] = Token.assignmentAdd,
+		[""] = Token.add,
 	},
 	["*"] = {
-		["="] = Token.operator.assignmentMul,
-		[""] = Token.operator.mul,
+		["="] = Token.assignmentMul,
+		[""] = Token.mul,
 	},
 	["/"] = {
 		["/"] = {
-			["="] = Token.operator.assignmentFloorDiv,
-			[""] = Token.operator.floorDiv,
+			["="] = Token.assignmentFloorDiv,
+			[""] = Token.floorDiv,
 		},
-		["="] = Token.operator.assignmentAdd,
-		[""] = Token.operator.add,
+		["="] = Token.assignmentAdd,
+		[""] = Token.add,
 	},
 	["<"] = {
-		["="] = Token.operator.lessThanEqual,
-		[""] = Token.operator.lessThan,
+		["="] = Token.lessThanEqual,
+		[""] = Token.lessThan,
 	},
 	[">"] = {
-		["="] = Token.operator.greaterThanEqual,
-		[""] = Token.operators.greaterThan,
+		["="] = Token.greaterThanEqual,
+		[""] = Token.greaterThan,
 	},
-	["%"] = Token.operator.mod,
+	["%"] = Token.mod,
 	["~"] = {
-		["="] = Token.operator.notEqual,
-		[""] = function (code, i)
-			error("Invalid character at " .. i)
-		end,
+		["="] = Token.notEqual,
+		[""] = errorLex,
 	},
-	["^"] = Token.operator.pow,
-	["{"] = Token.seperator.braceStart,
-	["}"] = Token.seperator.braceEnd,
-	["#"] = Token.operator.length,
-	["="] = Token.operator.assignment,
-	[":"] = Token.operator.colon,
-	[","] = Token.seperator.comma,
+	["^"] = Token.pow,
+	["{"] = Token.braceStart,
+	["}"] = Token.braceEnd,
+	["#"] = Token.length,
+	["="] = {
+		["="] = Token.equal,
+		[""] = Token.assignment
+	},
+	[":"] = Token.colon,
+	[","] = Token.comma,
 	["."] = {
 		["."] = {
-			["="] = Token.operator.assignmentConcat,
-			[""] = Token.operator.concat,
+			["."] = Tokens.ellipses
+			["="] = Token.assignmentConcat,
+			[""] = Token.concat,
 		},
-		[""] = Token.operator.dot,
+		[""] = Token.dot,
 	},
-	["("] = Token.seperator.paraStart,
-	[")"] = Token.seperator.paraEnd,
+	["("] = Token.paraStart,
+	[")"] = Token.paraEnd,
 	["["] = {
 		["["] = consumeMultilineString,
 		["="] = consumeMultilineString,
-		[""] = Token.seperator.bracketStart,
+		[""] = Token.bracketStart,
 	},
-	["]"] = Token.seperator.bracketEnd,
-	["?"] = Token.operator.optional,
-	[""] = function (code, i)
-		error("Unrecognized character at " .. i)
-	end,
+	["]"] = Token.bracketEnd,
+	["?"] = Token.optional,
+	[""] = errorLex,
 }
 
 for i = 0, 9 do
 	tree[tostring(i)] = consumeNumber
+	tree["."][tostring(i)] = consumeNumber
 end
 
 for i, v in string.split("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_", "") do
@@ -171,53 +178,37 @@ end
 
 --Our API
 
-local function peek(info: Info, n: number): ({Token}, number)
-	local i = info.index
-
+local function lexify(info: Info): { Tokens.Token }
 	local tokens = {}
 
-	while #tokens < n and i < #info.code do
-		local result = tree[string.sub(info.code, i, i)]
-		local last = tree
-		while true do
-			if type(result) == "function" then
-				local token, j = result(info.code, i)
-				i = j
+	local result = tree
+	local last
 
-				if token then table.insert(tokens, token) end
-				break
+	while info.index < #info.code do
+		last = result
+		result = result[string.sub(info.code, info.index, info.index)]
 
-			elseif result == nil then
-				result = last[""]
-				i -= 1
-				continue
-
-			elseif type(result) == "userdata" then
-				table.insert(tokens, { kind = result })
-				break
-
-			end
-
-			i += 1
-			last = result
-			result = result[string.sub(info.code, i, i)]
+		if result == nil then
+			result = last[""]
+			info.index -= 1
 		end
 
-		i += 1
+		if type(result) == "function" then
+			result(info, tokens)
+		elseif type(result) == "userdata" then
+			table.insert(tokens, { kind = result })
+		else
+			info.index += 1
+			continue
+		end
+
+		result = tree
+		info.index += 1
 	end
 
-	return tokens, i
-end
-
-local function consume(info: Info, n: number): {Token}
-	local t, i = peek(info, n)
-
-	info.index = i + 1
-
-	return t
+	return tokens
 end
 
 return {
-	peek = peek,
-	consume = consume,
+	lexify = lexify,
 }
