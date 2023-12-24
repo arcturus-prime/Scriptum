@@ -1,5 +1,6 @@
 local Lexer = require(script.Parent.Lexer)
 local Tokens = require(script.Parent.Tokens)
+local Nodes = require(script.Parent.Nodes)
 
 local Token = Tokens.token
 

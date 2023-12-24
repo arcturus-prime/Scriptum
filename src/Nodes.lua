@@ -3,15 +3,19 @@ export type Node = {
 	kind: any
 }
 
-export type Type = Node & {
+export type TableConstructor = Node & {
+	body: { [Node] : Node },
+}
 
+export type FunctionConstructor = Node & {
+	args: { Node },
+	body: { Node },
 }
 
 export type Variable = Node & {
-	type: Type?,
-	scope: { Node },
 	name: string,
 }
+
 export type Constant = Node & { value: any }
 
 export type Value = Variable | Constant
@@ -51,8 +55,8 @@ local node = {
 	constant = newproxy(),
 	list = newproxy(),
 
-	functionDecl = newproxy(),
-	tableDecl = newproxy(),
+	functionConstructor = newproxy(),
+	tableConstructor = newproxy(),
 
 	whileLoop = newproxy(),
 	repeatLoop = newproxy(),
