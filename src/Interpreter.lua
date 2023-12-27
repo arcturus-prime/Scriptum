@@ -1,5 +1,53 @@
 --!native
 
+local opcode = {
+	move = newproxy(),
+
+	add = newproxy(),
+	sub = newproxy(),
+	neg = newproxy(),
+	mul = newproxy(),
+	div = newproxy(),
+	pow = newproxy(),
+	mod = newproxy(),
+	concat = newproxy(),
+
+	tabnew = newproxy(),
+	tabget = newproxy(),
+	tabset = newproxy(),
+	
+	len = newproxy(),
+
+	closure = newproxy(),
+	capture = newproxy(),
+	prop = newproxy(),
+
+	upget = newproxy(),
+	upset = newproxy(),
+	
+	load = newproxy(),
+
+	jump = newproxy(),
+	jumpn = newproxy(),
+	jumpa = newproxy(),
+
+	land =  newproxy(),
+	lor = newproxy(),
+	lnot = newproxy(),
+	eq = newproxy(),
+	lt = newproxy(),
+	lte = newproxy(),
+
+	call = newproxy(),
+	ret = newproxy(),
+}
+
+local mnemonic = {}
+
+for k, v in opcode do
+	mnemonic[v] = k
+end
+
 export type Closure = {
 	func: {},
 	up_stack: { {}? },
@@ -7,12 +55,6 @@ export type Closure = {
 }
 
 export type Chunk = { {} }
-
-
-local Operations = require(script.Parent.Operations)
-
-local Opcodes = Operations.opcode
-local Mnemonics = Operations.mnemonic
 
 
 local function execute(chunk: Chunk, env: {})
@@ -34,100 +76,99 @@ local function execute(chunk: Chunk, env: {})
 	while (true) do
 		local op = func[counter]
 
-		print("Executing instruction " .. Mnemonics[op] .. " at " .. counter)
+		print("Executing instruction " .. mnemonics[op] .. " at " .. counter)
 
-		if op == Opcodes.move then
+		if op == opcode.move then
 			local a, b = func[counter + 1], func[counter + 2]
 
 			stack[a] = stack[b]
 
 			counter += 3
 
-		elseif op == Opcodes.add then
+		elseif op == opcode.add then
 			local a, b, c = func[counter + 1], func[counter + 2], func[counter + 3]
 
 			stack[a] = stack[b] + stack[c]
 
 			counter += 4
 
-		elseif op == Opcodes.sub then
+		elseif op == opcode.sub then
 			local a, b, c = func[counter + 1], func[counter + 2], func[counter + 3]
 
 			stack[a] = stack[b] - stack[c]
 
 			counter += 4
 		
-		elseif op == Opcodes.mul then
+		elseif op == opcode.mul then
 			local a, b, c = func[counter + 1], func[counter + 2], func[counter + 3]
 
 			stack[a] = stack[b] * stack[c]
 
 			counter += 4
 
-		elseif op == Opcodes.div then
+		elseif op == opcode.div then
 			local a, b, c = func[counter + 1], func[counter + 2], func[counter + 3]
 
 			stack[a] = stack[b] / stack[c]
 
 			counter += 4
 		
-		elseif op == Opcodes.neg then
+		elseif op == opcode.neg then
 			local a, b = func[counter + 1], func[counter + 2]
 
 			stack[a] = - stack[b]
 
 			counter += 3
 
-		elseif op == Opcodes.pow then
+		elseif op == opcode.pow then
 			local a, b, c = func[counter + 1], func[counter + 2], func[counter + 3]
 
 			stack[a] = stack[b] ^ stack[c]
 
 			counter += 4
 		
-		elseif op == Opcodes.mod then
+		elseif op == opcode.mod then
 			local a, b, c = func[counter + 1], func[counter + 2], func[counter + 3]
 
 			stack[a] = stack[b] % stack[c]
 
 			counter += 4
-
-		elseif op == Opcodes.concat then
+		elseif op == opcode.concat then
 			local a, b, c = func[counter + 1], func[counter + 2], func[counter + 3]
 
 			stack[a] = stack[b] .. stack[c]
 
 			counter += 4
 		
-		elseif op == Opcodes.tabnew then
+		elseif op == opcode.tabnew then
 			local a = func[counter + 1]
 
 			stack[a] = {}
 
 			counter += 2
 		
-		elseif op == Opcodes.tabget then
+		elseif op == opcode.tabget then
 			local a, b, c = func[counter + 1], func[counter + 2], func[counter + 3]
 
 			stack[a] = stack[b][stack[c]]
 
 			counter += 4
 
-		elseif op == Opcodes.tabset then
+		elseif op == opcode.tabset then
 			local a, b, c = func[counter + 1], func[counter + 2], func[counter + 3]
 
 			stack[a][stack[b]] = stack[c]
 
 			counter += 4
 		
-		elseif op == Opcodes.len then
+		elseif op == opcode.len then
 			local a, b = func[counter + 1], func[counter + 2]
 
 			stack[a] = #stack[b]
 
 			counter += 3
 
-		elseif op == Opcodes.closure then
+		elseif op == opcode.closure then
 			local a, b = func[counter + 1], func[counter + 2]
 
 			local new_closure: Closure = { func = chunk[b], up_stack = {}, up_index = {} }
@@ -138,7 +179,7 @@ local function execute(chunk: Chunk, env: {})
 
 			counter += 3
 		
-		elseif op == Opcodes.capture then
+		elseif op == opcode.capture then
 			local a, b = func[counter + 1], func[counter + 2]
 
 			table.insert(stack[a].up_stack, stack)
@@ -146,7 +187,7 @@ local function execute(chunk: Chunk, env: {})
 
 			counter += 3
 
-		elseif op == Opcodes.prop then
+		elseif op == opcode.prop then
 			local a, b = func[counter + 1], func[counter + 2]
 
 			table.insert(stack[a].up_stack, up_stack[b])
@@ -154,7 +195,7 @@ local function execute(chunk: Chunk, env: {})
 
 			counter += 3
 
-		elseif op == Opcodes.upset then
+		elseif op == opcode.upset then
 			local a, b = func[counter + 1], func[counter + 2]
 
 			up_stack[a][up_index[a]] = stack[b]
@@ -162,82 +203,82 @@ local function execute(chunk: Chunk, env: {})
 
 			counter += 3
 
-		elseif op == Opcodes.upget then
+		elseif op == opcode.upget then
 			local a, b = func[counter + 1], func[counter + 2]
 
 			stack[a] = up_stack[b][up_index[b]]
 
 			counter += 3
 		
-		elseif op == Opcodes.load then
+		elseif op == opcode.load then
 			local a, b = func[counter + 1], func[counter + 2]
 
 			stack[a] = b
 
 			counter += 3
 
-		elseif op == Opcodes.jump then
+		elseif op == opcode.jump then
 			local a, b = func[counter + 1], func[counter + 2]
 
 			counter += 3
 
 			if stack[a] then counter += b end
 		
-		elseif op == Opcodes.jumpn then
+		elseif op == opcode.jumpn then
 			local a, b = func[counter + 1], func[counter + 2]
 
 			counter += 3
 			
 			if not stack[b] then counter += a end
 
-		elseif op == Opcodes.jumpa then
+		elseif op == opcode.jumpa then
 			local a = func[counter + 1]
 
 			counter += a + 3
 		
-		elseif op == Opcodes.land then
+		elseif op == opcode.land then
 			local a, b, c = func[counter + 1], func[counter + 2], func[counter + 3]
 
 			stack[a] = stack[b] and stack[c]
 
 			counter += 4
 		
-		elseif op == Opcodes.lor then
+		elseif op == opcode.lor then
 			local a, b, c = func[counter + 1], func[counter + 2], func[counter + 3]
 
 			stack[a] = stack[b] or stack[c]
 
 			counter += 4
 
-		elseif op == Opcodes.lnot then
+		elseif op == opcode.lnot then
 			local a, b, c = func[counter + 1], func[counter + 2], func[counter + 3]
 
 			stack[a] = not stack[b]
 
 			counter += 4
 		
-		elseif op == Opcodes.eq then
+		elseif op == opcode.eq then
 			local a, b, c  = func[counter + 1], func[counter + 2], func[counter + 3]
 
 			stack[a] = stack[b] == stack[c]
 
 			counter += 4
 
-		elseif op == Opcodes.lt then
+		elseif op == opcode.lt then
 			local a, b, c  = func[counter + 1], func[counter + 2], func[counter + 3]
 
 			stack[a] = stack[b] < stack[c]
 
 			counter += 4
 
-		elseif op == Opcodes.lte then
+		elseif op == opcode.lte then
 			local a, b, c  = func[counter + 1], func[counter + 2], func[counter + 3]
 
 			stack[a] = stack[b] <= stack[c]
 
 			counter += 4
 
-		elseif op == Opcodes.call then
+		elseif op == opcode.call then
 			local a, b = func[counter + 1], func[counter + 2]
 
 			local new_closure = stack[a]
@@ -259,7 +300,7 @@ local function execute(chunk: Chunk, env: {})
 			func = new_closure.func
 			counter = 1
 		
-		elseif op == Opcodes.ret then
+		elseif op == opcode.ret then
 			local a = func[counter + 1]
 
 			local old_stack = stack
