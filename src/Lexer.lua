@@ -1,57 +1,3 @@
-local token = {
-	word = newproxy(),
-	whitespace = newproxy(),
-	
-	string = newproxy(),
-	number = newproxy(),
-
-	comment = newproxy(),
-
-	colon = newproxy(),
-	length = newproxy(),
-	dot = newproxy(),
-	concat = newproxy(),
-	ellipses = newproxy(),
-	add = newproxy(),
-	sub = newproxy(),
-	mul = newproxy(),
-	div = newproxy(),
-	mod = newproxy(),
-	pow = newproxy(),
-	floorDiv = newproxy(),
-	equal = newproxy(),
-	notEqual = newproxy(),
-	lessThan = newproxy(),
-	lessThanEqual = newproxy(),
-	greaterThan = newproxy(),
-	greaterThanEqual = newproxy(),
-	assignment = newproxy(),
-	assignmentAdd = newproxy(),
-	assignmentSub = newproxy(),
-	assignmentMul = newproxy(),
-	assignmentDiv = newproxy(),
-	assignmentMod = newproxy(),
-	assignmentPow = newproxy(),
-	assignmentConcat = newproxy(),
-	optional = newproxy(),
-
-	comma = newproxy(),
-	braceStart = newproxy(),
-	braceEnd = newproxy(),
-	paraStart = newproxy(),
-	paraEnd = newproxy(),
-	bracketStart = newproxy(),
-	bracketEnd = newproxy(),
-	arrow = newproxy(),
-}
-
-local tokenName = {}
-
-for k, v in token do
-	tokenName[v] = k
-end
-
-
 export type Token = {
 	kind: any,
 	value: any?,
@@ -63,14 +9,100 @@ export type Info = {
 }
 
 
+local token = {
+	id = newproxy(),
+
+	whitespace = newproxy(),
+	
+	string = newproxy(),
+	number = newproxy(),
+
+	comment = newproxy(),
+}
+
+local tokenSymbol = {
+	[","] = newproxy(),
+	["#"] = newproxy(),
+	["."] = newproxy(),
+	[".."] = newproxy(),
+	["..."] = newproxy(),
+	["+"] = newproxy(),
+	["-"] = newproxy(),
+	["*"] = newproxy(),
+	["/"] = newproxy(),
+	["%"] = newproxy(),
+	["^"] = newproxy(),
+	["//"] = newproxy(),
+	["=="] = newproxy(),
+	["~="] = newproxy(),
+	["<"] = newproxy(),
+	["<="] = newproxy(),
+	[">"] = newproxy(),
+	[">="] = newproxy(),
+	["="] = newproxy(),
+	["+="] = newproxy(),
+	["-="] = newproxy(),
+	["*="] = newproxy(),
+	["/="] = newproxy(),
+	["%="] = newproxy(),
+	["^="] = newproxy(),
+	["..="] = newproxy(),
+	["//="] = newproxy(),
+	["?"] = newproxy(),
+	[":"] = newproxy(),
+
+	[","] = newproxy(),
+	["{"] = newproxy(),
+	["}"] = newproxy(),
+	["("] = newproxy(),
+	[")"] = newproxy(),
+	["["] = newproxy(),
+	["]"] = newproxy(),
+	["->"] = newproxy(),
+}
+
+local tokenKeyword = {
+	["local"] = newproxy(),
+	["do"] = newproxy(),
+	["then"] = newproxy(),
+	["if"] = newproxy(),
+	["else"] = newproxy(),
+	["elseif"] = newproxy(),
+	["while"] = newproxy(),
+	["for"] = newproxy(),
+	["in"] = newproxy(),
+	["end"] = newproxy(),
+	["export"] = newproxy(),
+	["type"] = newproxy(),
+	["function"] = newproxy(),
+	["return"] = newproxy(),
+	["or"] = newproxy(),
+	["and"] = newproxy(),
+	["not"] = newproxy(),
+}
+
+for k, v in tokenSymbol do
+	token[k] = v
+end
+
+for k, v in tokenKeyword do
+	token[k] = v
+end
+
+local tokenName = {}
+
+for k, v in token do
+	tokenName[v] = k
+end
+
 local function isNotUnescapedChar(code: string, i: number, ending: string)
 	return string.sub(code, i, i) ~= ending or (string.sub(code, i - 1, i - 1) == "\\" and string.sub(code, i - 2, i - 1) ~= "\\\\")
 end
 
-local function consumeWord(info: Info, tokens: { Token })
+local function consumeID(info: Info, tokens: { Token })
 	local _, e = string.find(info.code, "%w+", info.index)
 
-	table.insert(tokens, { kind = token.word, value = string.sub(info.code, info.index, e) })
+	table.insert(tokens, { kind = token.id, value = string.sub(info.code, info.index, e) })
 	info.index = e
 end
 
@@ -155,65 +187,65 @@ local tree = {
 	["\'"] = consumeString,
 	["-"] = {
 		["-"] = consumeComment,
-		[">"] = token.arrow,
-		[""] = token.sub,
+		[">"] = token["->"],
+		[""] = token["-"],
 	},
 	["+"] = {
-		["="] = token.assignmentAdd,
-		[""] = token.add,
+		["="] = token["+="],
+		[""] = token["+"],
 	},
 	["*"] = {
-		["="] = token.assignmentMul,
-		[""] = token.mul,
+		["="] = token["*="],
+		[""] = token["*"],
 	},
 	["/"] = {
 		["/"] = {
-			["="] = token.assignmentFloorDiv,
-			[""] = token.floorDiv,
+			["="] = token["//="],
+			[""] = token["//"],
 		},
-		["="] = token.assignmentAdd,
-		[""] = token.add,
+		["="] = token["/="],
+		[""] = token["/"],
 	},
 	["<"] = {
-		["="] = token.lessThanEqual,
-		[""] = token.lessThan,
+		["="] = token["<="],
+		[""] = token["<"],
 	},
 	[">"] = {
-		["="] = token.greaterThanEqual,
-		[""] = token.greaterThan,
+		["="] = token[">="],
+		[""] = token[">"],
 	},
-	["%"] = token.mod,
+	["%"] = token["%"],
 	["~"] = {
-		["="] = token.notEqual,
+		["="] = token["~="],
 		[""] = errorLex,
 	},
-	["^"] = token.pow,
-	["{"] = token.braceStart,
-	["}"] = token.braceEnd,
-	["#"] = token.length,
+	["^"] = token["^"],
+	["{"] = token["{"],
+	["}"] = token["}"],
+	["#"] = token["#"],
 	["="] = {
-		["="] = token.equal,
-		[""] = token.assignment
+		["="] = token["=="],
+		[""] = token["="],
 	},
-	[":"] = token.colon,
-	[","] = token.comma,
+	[":"] = token[":"],
+	[","] = token[","],
 	["."] = {
 		["."] = {
-			["."] = tokens.ellipses
-			["="] = token.assignmentConcat,
-			[""] = token.concat,
+			["."] = token["..."],
+			["="] = token["..="],
+			[""] = token[".."],
 		},
-		[""] = token.dot,
+		[""] = token["."],
 	},
-	["("] = token.paraStart,
-	[")"] = token.paraEnd,
+	["("] = token["("],
+	[")"] = token[")"],
 	["["] = {
 		["["] = consumeMultilineString,
 		["="] = consumeMultilineString,
-		[""] = token.bracketStart,
+		[""] = token["["],
 	},
-	["]"] = token.bracketEnd,
-	["?"] = token.optional,
+	["]"] = token["]"],
+	["?"] = token["?"],
 	[""] = errorLex,
 }
 
@@ -222,13 +254,56 @@ for i = 0, 9 do
 	tree["."][tostring(i)] = consumeNumber
 end
 
+for k, v in tokenKeyword do
+	local last = tree
+	for i = 1, #k do
+		local char = string.sub(k, i, i)
+
+		if i == #k then
+			last[char] = v
+			break
+		else
+			last[char] = {}
+		end
+		
+		last = last[char]
+		last[""] = consumeID
+	end
+end
+
+for k, v in tokenSymbol do
+	local last = tree
+	for i = 1, #k do
+		local char = string.sub(k, i, i)
+
+		if i == #k then
+			last[char] = v
+			break
+		elseif not last[char] then
+			last[char] = {}
+		end
+		
+		if not last[""] then 
+			last[""] = tokenSymbol[string.sub(k, 1, i - 1)]
+		end
+
+		last = last[char] 
+	end
+end
+
+
 for i, v in string.split("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_", "") do
-	tree[v] = consumeWord
+	if not tree[v] then
+		tree[v] = consumeID
+		continue
+	end
 end
 
 for i, v in string.split(" \r\n\t", "") do
 	tree[v] = consumeWhitespace
 end
+
+print(tree)
 
 local function lexify(info: Info): { Token }
 	local tokens = {}

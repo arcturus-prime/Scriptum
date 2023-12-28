@@ -1,5 +1,14 @@
 --!native
 
+export type Closure = {
+	func: {},
+	up_stack: { {}? },
+	up_index: { number? },
+}
+
+export type Chunk = { {} }
+
+
 local opcode = {
 	move = newproxy(),
 
@@ -47,15 +56,6 @@ local mnemonic = {}
 for k, v in opcode do
 	mnemonic[v] = k
 end
-
-export type Closure = {
-	func: {},
-	up_stack: { {}? },
-	up_index: { number? },
-}
-
-export type Chunk = { {} }
-
 
 local function execute(chunk: Chunk, env: {})
 	local stacks = {}
@@ -324,5 +324,9 @@ end
 
 
 return  {
+	opcodes = {
+		enum = opcode,
+		name = mnemonic
+	}
 	execute = execute
 }
