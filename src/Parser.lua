@@ -1,27 +1,37 @@
 local Lexer = require(script.Parent.Lexer)
 
-local function parse(info: Info)
-	local ast = {}
 
-	while info.index < #info.tokens do
-		local token = info.tokens[info.index]
+export type State = {
+	tokens: { Lexer.Token },
+	index: number,
 
-		if token == Lexer.tokens.enum.word then
-			if token.value == "local" then
+	stack: {}
+}
 
-			elseif token.value == "function"
-		elseif then
 
+local function peek(state: State, i: number)
+	return state.stack[#state.stack - i + 1]
+end
+
+local function parse(tokens: { Lexer.Token }})
+	local syntax = {}
+	local state = {
+		tokens = tokens,
+		index = 1,
+		stack = {},
+	}
+
+	while state.index < #state.tokens do
+		if peek(state, 1).kind == "block" and peek(state, 2).kind == "typedList" and peek(stack, 3).kind == "function" then
+
+		else		
+			table.insert(state.stack, state.tokens[state.index + i - 1])
 		end
 	end
 
-	return ast
+	return state.stack
 end
 
 return {
 	parse = parse,
-	nodes = {
-		enum = node,
-		name = nodeName
-	},
 }
